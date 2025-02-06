@@ -2,7 +2,7 @@ import argparse
 import json
 import os
 import re
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 DEFAULT_CUTOFF_DATE = "10-31"
 
@@ -17,6 +17,10 @@ cutoff_dates = {
 }
 
 
+def ms_to_minutes(ms: int) -> int:
+    return round(ms / 1000 / 60)
+
+
 def calculate_weight(record: Dict[str, Any]) -> int:
     """
     TODO: unsure if there is an actual weighting algorithm. need to test with more data to be more certain
@@ -29,26 +33,29 @@ def total_time_played(data: List[Dict[str, Any]]) -> int:
     return sum([d["ms_played"] for d in data])
 
 
-def top_artists(data: List[Dict[str, Any]], k: int) -> List[str]:
-    count_artists = {}
+def top_artists(data: List[Dict[str, Any]], k: int) -> List[Tuple[str, int, int]]:
+    count_artists: Dict[str, Dict[str, int]] = {}  # map artist name to num listens and cumulative time
     for d in data:
         artist_name = d["master_metadata_album_artist_name"]
-        if artist_name not in count_artists:
-            count_artists[artist_name] = 0
-        count_artists[artist_name] += calculate_weight(d)
+        if artist_name is not None and artist_name not in count_artists:
+            count_artists[artist_name] = {"count": 0, "time": 0}
+        temp = count_artists[artist_name]
+        temp["count"] += calculate_weight(d)
+        temp["time"] += d["ms_played"]
+        count_artists[artist_name] = temp
     artists = []
     for (artist, count) in count_artists.items():
-        artists.append((artist, count))
+        artists.append((artist, count["count"], count["time"]))
 
     artists.sort(key=lambda t: t[1], reverse=True)
-    artists = [(artist, round(count)) for (artist, count) in artists]
+    artists = [(artist, round(count), ms_to_minutes(time)) for (artist, count, time) in artists]
     result = artists[:k]
 
     # if there is a tie, just include those values
     last_val = result[-1][1]
-    for (artist, count) in artists[k:]:
+    for (artist, count, minutes) in artists[k:]:
         if count == last_val:
-            result.append((artist, count))
+            result.append((artist, count, minutes))
     return result
 
 
@@ -164,7 +171,7 @@ def main():
             if len(artists) != num:
                 print(f"There was a tie found, so instead of having {num} artists, found {len(artists)}.")
 
-            time_played = round(total_time_played(filtered_data) / 1000 / 60)
+            time_played = ms_to_minutes(total_time_played(filtered_data))
             wrapped_by_year[year] = {
                 "songs": songs,
                 "artists": artists,

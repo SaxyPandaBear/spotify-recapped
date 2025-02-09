@@ -51,6 +51,9 @@ def top_artists(data: List[Dict[str, Any]], k: int) -> List[Tuple[str, int, int]
     artists = [(artist, round(count), ms_to_minutes(time)) for (artist, count, time) in artists]
     result = artists[:k]
 
+    if len(result) == 0:
+        return []
+
     # if there is a tie, just include those values
     last_val = result[-1][1]
     for (artist, count, minutes) in artists[k:]:
@@ -77,6 +80,10 @@ def top_songs(data: List[Dict[str, Any]], k: int) -> List[str]:
     song_counts.sort(key=lambda t: t[1], reverse=True)
     song_counts = [(song[:song.find("+")], round(count)) for (song, count) in song_counts]
     result = song_counts[:k]
+
+    if len(result) == 0:
+        return []
+
     last_val = result[-1][1]
     for (song, count) in song_counts[k:]:
         if last_val == count:
